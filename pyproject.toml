@@ -1,0 +1,40 @@
+[project]
+name = "resample"
+version = "0.1.0"
+description = "Live melody-aware loop chopper for Ableton. Same sample, new idea."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Resampler" }]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.12",
+    "soundfile>=0.12",
+    "librosa>=0.10",
+    "soxr>=0.5",
+    "pedalboard>=0.9",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+stretch = ["python-stretch>=0.3"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+resample = "resample.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+resample = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

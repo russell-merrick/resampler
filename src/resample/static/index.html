@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Resampler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css?v=43" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="led"></span>
+      <h1>RESAMPLER</h1>
+    </div>
+    <div class="top-right">
+      <button type="button" id="options-open" class="ghost">⚙️ options</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel library" id="library">
+      <div class="panel-h">
+        <span>Sample selection</span>
+        <div class="panel-h-right">
+          <span class="dim" id="lib-status">detecting…</span>
+          <button type="button" class="ghost hidden" id="lib-toggle">change sample</button>
+        </div>
+      </div>
+      <div id="lib-body">
+      <div class="lib-row">
+        <label class="grow">folder
+          <input id="lib-root" placeholder="C:\Users\you\Documents\Splice" />
+        </label>
+        <button type="button" class="ghost" id="lib-detect">📂 detect</button>
+        <button type="button" class="ghost" id="lib-save">💾 save</button>
+      </div>
+      <div class="lib-row">
+        <label class="grow">search
+          <input id="lib-q" placeholder="ooh, aah, choir, chop, pack name" />
+        </label>
+        <label>kind
+          <select id="lib-kind">
+            <option value="all">all pitched</option>
+            <option value="vocals">vocals</option>
+            <option value="pad">pads / ooh aah / choir</option>
+            <option value="lead">leads / chops / adlibs</option>
+            <option value="bass">bass loops</option>
+            <option value="synth">synth loops</option>
+          </select>
+        </label>
+        <button type="button" id="lib-search">🔍 search</button>
+        <input type="file" id="file" accept="audio/*,.wav,.aiff,.aif,.mp3,.flac" hidden />
+        <button type="button" class="ghost" id="browse">browse</button>
+      </div>
+      <div class="lib-deck">
+        <audio id="lib-player"></audio>
+        <div class="lib-scrub" id="lib-scrub" title="seek">
+          <div class="lib-fill" id="lib-fill"></div>
+        </div>
+        <span class="dim" id="lib-now">0:00</span>
+      </div>
+      <ul id="lib-hits"></ul>
+      </div>
+    </section>
+
+    <section class="workspace hidden" id="workspace">
+      <div class="panel deck">
+        <div class="panel-h">
+          <span class="dim" id="status">load a sample</span>
+        </div>
+        <div class="transport">
+          <div class="transport-row">
+            <button type="button" id="inspire" class="play inspire">💡 inspire</button>
+            <button type="button" id="play" class="play">▶ play</button>
+            <label class="bpm-lab">bpm
+              <span class="num-wrap">
+                <input id="bpm" type="number" min="60" max="220" step="1" value="128" />
+                <span class="num-nudges">
+                  <button type="button" data-nudge="bpm" data-dir="1" tabindex="-1" aria-label="bpm up">▲</button>
+                  <button type="button" data-nudge="bpm" data-dir="-1" tabindex="-1" aria-label="bpm down">▼</button>
+                </span>
+              </span>
+            </label>
+            <span id="src-name" class="dim"></span>
+            <label class="key-lab">key
+              <select id="key-root"></select>
+              <select id="key-mode"></select>
+            </label>
+            <label class="check">reverse
+              <input type="checkbox" id="reverse" />
+            </label>
+            <label class="check" title="Play the file past the note end, for the full step">through
+              <input type="checkbox" id="through" />
+            </label>
+            <label class="swing-lab">swing
+              <input id="swing" type="range" min="0" max="66" step="1" value="0" />
+              <strong id="swing-val">0%</strong>
+            </label>
+          </div>
+          <div class="transport-row">
+            <button type="button" id="export" class="ghost">💾 export wav</button>
+            <label class="bpm-lab">export
+              <span class="num-wrap">
+                <input id="bars" type="number" min="1" max="32" step="1" value="4" title="bars to bounce" />
+                <span class="num-nudges">
+                  <button type="button" data-nudge="bars" data-dir="1" tabindex="-1" aria-label="export bars up">▲</button>
+                  <button type="button" data-nudge="bars" data-dir="-1" tabindex="-1" aria-label="export bars down">▼</button>
+                </span>
+              </span>
+            </label>
+            <button type="button" id="drag-live" class="ghost drag-live" draggable="true">↕ drag to Live</button>
+          </div>
+        </div>
+        <div class="note-row" id="note-row"></div>
+        <canvas id="wave" class="wave" height="64" title="amber band = length/offset window"></canvas>
+        <div class="kit-row">
+          <input id="kit-name" placeholder="kit name" />
+          <button type="button" class="ghost" id="kit-save">💾 save kit</button>
+          <select id="kit-list"></select>
+          <button type="button" class="ghost" id="kit-load">load</button>
+          <button type="button" class="ghost" id="kit-delete">delete</button>
+        </div>
+
+        <div class="viz helm-wrap">
+          <div class="viz-help">
+            <button type="button" class="help" aria-label="Control star help">?</button>
+            <p class="tip">Drag a point along its axis. SPEED is how fast steps fire (whole notes to 32nds). PATTERN is the idea: lock, leap, reverse, ping-pong, call/response. LENGTH and OFFSET pick which bars of the sample you steal notes from. PITCH stays in the detected key. Ctrl+click or double-click a dot to lock it so Inspire will not change it.</p>
+          </div>
+          <canvas id="helm" width="720" height="380"></canvas>
+        </div>
+
+        <div class="seq-panel">
+          <div class="panel-h">
+            <span>🔁 the loop</span>
+            <span class="dim" id="loop-label">click a cell for the note · % row is chance</span>
+          </div>
+          <label class="key-lab">loop length
+            <select id="loop-bars">
+              <option value="1" selected>1 bar</option>
+              <option value="2">2 bars</option>
+              <option value="4">4 bars</option>
+            </select>
+          </label>
+          <p class="hint-line" id="loop-explain">
+            Sample length/offset = which notes you can use. Loop length = how long the idea repeats.
+            The % row is chance: click 100→75→50→25→0, or drag to set. Missed steps stay silent.
+          </p>
+          <div id="seq-grid"></div>
+        </div>
+
+        <div class="motion-panel" id="motion">
+          <div class="panel-h">
+            <span>Automation</span>
+            <div class="panel-h-right">
+              <label class="key-lab">span
+                <select id="motion-bars">
+                  <option value="1">1 bar</option>
+                  <option value="2">2 bars</option>
+                  <option value="4" selected>4 bars</option>
+                  <option value="8">8 bars</option>
+                  <option value="16">16 bars</option>
+                </select>
+              </label>
+              <label class="check">loop
+                <input type="checkbox" id="motion-loop" checked />
+              </label>
+            </div>
+          </div>
+          <p class="hint-line">
+            Automate star params over time. Left handle is the start of the span, right is the end.
+            Locked axes are skipped. Uncheck loop to rise once and hold.
+          </p>
+          <div id="motion-lanes"></div>
+        </div>
+
+        <div class="viz">
+          <div class="viz-help">
+            <button type="button" class="help" aria-label="Map help">?</button>
+            <p class="tip">Melody map. Angle is pitch class (C at the top). Radius is time in the sample — center is the start, edge is the end. Dashed rings are your length/offset window. Click a star to drop that note on the current loop step.</p>
+          </div>
+          <canvas id="star" width="720" height="440"></canvas>
+        </div>
+
+        <details class="sliders">
+          <summary>🎚️ sliders</summary>
+        <label class="fader">
+          <span class="fader-h"><span>speed</span><strong id="speed-val">16th</strong></span>
+          <input id="speed" type="range" min="0" max="7" step="1" value="5" />
+          <span class="ticks">
+            <i>1</i><i>1/2</i><i>1/4</i><i>1/8</i><i>8t</i><i>1/16</i><i>16t</i><i>1/32</i>
+          </span>
+        </label>
+
+        <label class="fader">
+          <span class="fader-h"><span>pattern</span><strong id="pattern-val">lock</strong></span>
+          <input id="pattern" type="range" min="0" max="7" step="1" value="0" />
+          <span class="ticks" id="pattern-ticks">
+            <i>lock</i><i>jump</i><i>hold</i><i>rev</i><i>ping</i><i>leap</i><i>scat</i><i>call</i>
+          </span>
+        </label>
+
+        <label class="fader">
+          <span class="fader-h"><span>length</span><strong id="len-val">2 bars</strong></span>
+          <input id="length" type="range" min="0" max="3" step="1" value="1" />
+          <span class="ticks"><i>1</i><i>2</i><i>4</i><i>8</i></span>
+        </label>
+
+        <label class="fader">
+          <span class="fader-h"><span>offset</span><strong id="off-val">bar 1</strong></span>
+          <input id="offset" type="range" min="0" max="8" step="1" value="0" />
+          <span class="ticks" id="offset-ticks"><i>0</i></span>
+        </label>
+
+        <label class="fader">
+          <span class="fader-h"><span>pitch</span><strong id="pitch-val">0 · in key</strong></span>
+          <input id="pitch" type="range" min="0" max="12" step="1" value="6" />
+          <span class="hint-line" id="pitch-hint">only scale tones from the detected key</span>
+        </label>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <div id="options" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <div class="panel-h">
+        <span>⚙️ options</span>
+        <button type="button" class="ghost" id="options-close">✕ close</button>
+      </div>
+      <label>theme
+        <select id="opt-theme">
+          <option value="dark">🌙 dark</option>
+          <option value="light">☀️ light</option>
+          <option value="neon">⚡ neon</option>
+          <option value="rainbow">🌈 rainbow</option>
+        </select>
+      </label>
+      <label>default bpm
+        <input id="opt-bpm" type="number" min="60" max="220" step="1" value="128" />
+      </label>
+      <label>default loop length
+        <select id="opt-loop">
+          <option value="1">1 bar</option>
+          <option value="2">2 bars</option>
+          <option value="4">4 bars</option>
+        </select>
+      </label>
+      <label class="check">auto-inspire on load
+        <input type="checkbox" id="opt-auto-inspire" />
+      </label>
+      <button type="button" id="creeper-hiss" class="creeper-btn">creeper hiss</button>
+      <p class="hint-line">Saved in this browser. Theme applies immediately.</p>
+    </div>
+  </div>
+
+  <footer>
+    <p>Space play/stop · Ctrl+R inspire · Ctrl+Z undo</p>
+  </footer>
+  <div id="creeper-boom" class="creeper-boom hidden" aria-hidden="true">
+    <!-- Creeper: Xbox México / CC BY 3.0, Wikimedia File:Minecraft Creeper (Crop).png -->
+    <img src="/static/creeper.png?v=2" alt="ssss…" id="creeper-pic" />
+  </div>
+  <script src="/static/live.js?v=41"></script>
+  <script src="/static/viz.js?v=41"></script>
+  <script src="/static/app.js?v=41"></script>
+</body>
+</html>
