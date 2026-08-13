@@ -705,18 +705,6 @@ function bindDeck() {
   $("key-root").addEventListener("change", applyKey);
   $("key-mode").addEventListener("change", applyKey);
 
-  const star = $("star");
-  if (star) {
-    star.addEventListener("click", (e) => {
-      const hit = window.nearestStar && window.nearestStar(star, e);
-      if (!hit) return;
-      snapshot();
-      const step = live.playing ? Math.max(live.step - 1, 0) : 0;
-      live.setStep(step, hit.i);
-      paintLabels();
-    });
-  }
-
   const helm = $("helm");
   if (helm) {
     let dragAxis = null;

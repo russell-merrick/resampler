@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/app.css?v=43" />
+  <link rel="stylesheet" href="/static/app.css?v=44" />
 </head>
 <body>
   <header class="top">
@@ -179,7 +179,7 @@
         <div class="viz">
           <div class="viz-help">
             <button type="button" class="help" aria-label="Map help">?</button>
-            <p class="tip">Melody map. Angle is pitch class (C at the top). Radius is time in the sample — center is the start, edge is the end. Dashed rings are your length/offset window. Click a star to drop that note on the current loop step.</p>
+            <p class="tip">Melody map — visual only. Angle is pitch class (C at the top). Radius is time in the sample — center is the start, edge is the end. Dashed rings are your length/offset window. The path and highlighted star follow the loop; they do not edit it.</p>
           </div>
           <canvas id="star" width="720" height="440"></canvas>
         </div>
@@ -264,7 +264,7 @@
     <img src="/static/creeper.png?v=2" alt="ssss…" id="creeper-pic" />
   </div>
   <script src="/static/live.js?v=41"></script>
-  <script src="/static/viz.js?v=41"></script>
-  <script src="/static/app.js?v=41"></script>
+  <script src="/static/viz.js?v=42"></script>
+  <script src="/static/app.js?v=42"></script>
 </body>
 </html>

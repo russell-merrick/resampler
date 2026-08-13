@@ -150,21 +150,6 @@ function drawStarChart(st) {
   return stars;
 }
 
-function nearestStar(canvas, ev) {
-  const stars = canvas._stars || [];
-  const { x, y } = eventXY(canvas, ev);
-  let best = null;
-  let bestD = 48;
-  for (const s of stars) {
-    const d = Math.hypot(s.x - x, s.y - y);
-    if (d < bestD) {
-      bestD = d;
-      best = s;
-    }
-  }
-  return best;
-}
-
 function helmAxes(st) {
   const nOff = Math.max(st.maxOffsetBars || 0, 0);
   const nPitch = Math.max((st.ladder || []).length - 1, 1);
@@ -638,7 +623,6 @@ window.drawWaveform = drawWaveform;
 window.drawStarChart = drawStarChart;
 window.drawHelm = drawHelm;
 window.drawSeqGrid = drawSeqGrid;
-window.nearestStar = nearestStar;
 window.nearestHelmHandle = nearestHelmHandle;
 window.helmDragToValue = helmDragToValue;
 window.drawMotion = drawMotion;

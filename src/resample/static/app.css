@@ -449,7 +449,7 @@ button[type="submit"]:disabled { opacity: 0.5; cursor: wait; }
     radial-gradient(circle at 50% 46%, #221c14 0%, #12110f 70%, #0c0b0a 100%);
   border: 1px solid #2c2a25;
 }
-#star { height: 360px; cursor: pointer; }
+#star { height: 360px; cursor: default; }
 #helm { height: 340px; cursor: grab; }
 #helm:active { cursor: grabbing; }
 .viz-help { position: absolute; top: 8px; right: 8px; z-index: 3; }
