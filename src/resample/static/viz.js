@@ -1,6 +1,6 @@
-/** Control star (drag + lock) and pitch×time map. Sequence grid is the loop. */
+/** Control star (helm: drag + lock) and melody map (visual only). Sequence grid is the loop. */
 
-const STAR_PCS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const STAR_PCS = window.RESAMPLE_PITCH_CLASSES || ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 function canvasGeo(canvas) {
   const dpr = window.devicePixelRatio || 1;
@@ -145,8 +145,6 @@ function drawStarChart(st) {
       ctx.stroke();
     }
   }
-  canvas._stars = stars;
-  canvas._geo = geo;
   return stars;
 }
 
@@ -154,18 +152,26 @@ function helmAxes(st) {
   const nOff = Math.max(st.maxOffsetBars || 0, 0);
   const nPitch = Math.max((st.ladder || []).length - 1, 1);
   return [
-    { id: "speed", label: "SPEED", slider: "speed", min: 0, max: 7, angle: 0 },
-    { id: "length", label: "LENGTH", slider: "length", min: 0, max: 3, angle: 0.2 },
-    { id: "offset", label: "OFFSET", slider: "offset", min: 0, max: nOff, angle: 0.4 },
-    { id: "pitch", label: "PITCH", slider: "pitch", min: 0, max: nPitch, angle: 0.6 },
+    {
+      id: "speed",
+      label: "NOTE LENGTH",
+      slider: "speed",
+      min: 0,
+      max: Math.max((window.allowedSpeedIndices ? window.allowedSpeedIndices() : []).length - 1, 0),
+      angle: 0,
+    },
+    { id: "length", label: "CLIP WIDTH", slider: "length", min: 0, max: 3, angle: 1 / 6 },
+    { id: "offset", label: "OFFSET", slider: "offset", min: 0, max: nOff, angle: 2 / 6 },
+    { id: "pitch", label: "PITCH", slider: "pitch", min: 0, max: nPitch, angle: 3 / 6 },
     {
       id: "pattern",
       label: "PATTERN",
       slider: "pattern",
       min: 0,
       max: Math.max((window.RESAMPLE_IDEA_IDS || []).length - 1, 1),
-      angle: 0.8,
+      angle: 4 / 6,
     },
+    { id: "density", label: "DENSITY", slider: "density", min: 1, max: 10, angle: 5 / 6 },
   ];
 }
 
@@ -208,7 +214,9 @@ function helmValue(axis) {
 function helmReadout(st, axis) {
   const v = helmValue(axis);
   if (axis.id === "speed") {
-    const p = (window.RESAMPLE_PATTERNS || [])[v];
+    const allowed = window.allowedSpeedIndices ? window.allowedSpeedIndices() : [];
+    const lengths = window.RESAMPLE_NOTE_LENGTHS || [];
+    const p = lengths[allowed[v]] || lengths[v];
     return p ? p.label : String(v);
   }
   if (axis.id === "length") {
@@ -226,6 +234,7 @@ function helmReadout(st, axis) {
     const spec = window.RESAMPLE_IDEAS && window.RESAMPLE_IDEAS[id];
     return spec ? spec.label : id || "—";
   }
+  if (axis.id === "density") return `${v * 10}%`;
   return String(v);
 }
 
@@ -360,7 +369,7 @@ function nearestHelmHandle(canvas, ev, maxDist = 28) {
   if (ang < 0) ang += Math.PI * 2;
   const turn = ang / (Math.PI * 2);
   let closest = null;
-  let closestD = 0.12;
+  let closestD = 0.085;
   for (const axis of data.axes) {
     let d = Math.abs(turn - axis.angle);
     d = Math.min(d, 1 - d);
@@ -402,6 +411,8 @@ function drawSeqGrid(st) {
   }
   const cols = seq.length;
   const chance = st.chance && st.chance.length === cols ? st.chance : Array(cols).fill(1);
+  const mask = st.densityMask && st.densityMask.length === cols ? st.densityMask : Array(cols).fill(1);
+  const spans = st.spans && st.spans.length === cols ? st.spans : Array(cols).fill(1);
   const key = `${pool.join(",")}|${cols}`;
   const playing = st.playing ? st.stepIndex % cols : -1;
   if (root.dataset.key !== key) {
@@ -425,23 +436,55 @@ function drawSeqGrid(st) {
   root.querySelectorAll(".chance").forEach((el) => {
     const step = Number(el.dataset.step);
     const p = Math.round((chance[step] ?? 1) * 100);
+    const gated = mask[step] === 0;
     el.style.setProperty("--p", `${p}%`);
     el.classList.toggle("partial", p < 100);
     el.classList.toggle("mute", p === 0);
+    el.classList.toggle("sparse", gated);
     el.classList.toggle("now", step === playing);
     el.classList.toggle("miss", step === playing && st.lastHit === false);
     el.textContent = p === 100 ? "" : String(p);
-    el.title = `${p}% — this step fires ${p === 0 ? "never" : p === 100 ? "always" : `${p}% of the time`}`;
+    el.title = gated
+      ? "off this loop — density left this step silent"
+      : `${p}% — this step fires ${p === 0 ? "never" : p === 100 ? "always" : `${p}% of the time`}`;
   });
+  const coverAt = (step) => {
+    for (let s = step; s >= 0; s -= 1) {
+      const len = spans[s] || 0;
+      if (len >= 1 && s + len > step) return { start: s, length: len, note: seq[s] };
+    }
+    return null;
+  };
   root.querySelectorAll(".cell").forEach((cell) => {
     const step = Number(cell.dataset.step);
     const note = Number(cell.dataset.note);
-    const on = seq[step] === note;
-    const p = chance[step] ?? 1;
+    const cover = coverAt(step);
+    const on = Boolean(cover && cover.note === note);
+    const p = chance[cover ? cover.start : step] ?? 1;
+    const gated = on ? mask[cover.start] === 0 : mask[step] === 0;
+    const role = !on
+      ? ""
+      : cover.length === 1
+        ? "single"
+        : step === cover.start
+          ? "start"
+          : step === cover.start + cover.length - 1
+            ? "end"
+            : "mid";
     cell.classList.toggle("on", on);
+    cell.classList.toggle("sparse", gated && role !== "mid" && role !== "end");
+    cell.classList.toggle("hold-start", role === "start");
+    cell.classList.toggle("hold-mid", role === "mid");
+    cell.classList.toggle("hold-end", role === "end");
+    cell.classList.toggle("hold-single", role === "single");
     cell.classList.toggle("now", step === playing);
     cell.classList.toggle("miss", step === playing && st.lastHit === false);
-    cell.style.opacity = on && p < 0.99 ? String(Math.max(0.22, p)) : "";
+    cell.style.opacity = gated ? "" : on && p < 0.99 ? String(Math.max(0.22, p)) : "";
+    cell.title = on
+      ? gated
+        ? "click to turn this note back on"
+        : "drag right to extend · click to turn off"
+      : "click to place · drag to draw a longer note";
   });
 }
 
@@ -500,130 +543,10 @@ function drawWaveform(st) {
   }
 }
 
-function motionRange(id) {
-  if (id === "reverse") return { min: 0, max: 1 };
-  const el = document.getElementById(id);
-  if (!el) return { min: 0, max: 1 };
-  return { min: Number(el.min) || 0, max: Number(el.max) || 1 };
-}
-
-function motionLabel(id, raw) {
-  const v = Math.round(Number(raw) || 0);
-  if (id === "speed") return ((window.RESAMPLE_PATTERNS || [])[v] || {}).label || String(v);
-  if (id === "pattern") {
-    const key = (window.RESAMPLE_IDEA_IDS || [])[v];
-    const spec = window.RESAMPLE_IDEAS && window.RESAMPLE_IDEAS[key];
-    return spec ? spec.label : key || "—";
-  }
-  if (id === "length") {
-    const bars = (window.RESAMPLE_LENGTH_BARS || [1, 2, 4, 8])[v] ?? v;
-    return `${bars} bar${bars === 1 ? "" : "s"}`;
-  }
-  if (id === "offset") return `bar ${v + 1}`;
-  if (id === "pitch") {
-    const engine = window.ResampleLive;
-    const stn = (engine && engine.ladder[v]) ?? 0;
-    return stn === 0 ? "0" : stn > 0 ? `+${stn}` : `${stn}`;
-  }
-  if (id === "swing") return `${v}%`;
-  if (id === "reverse") return v >= 0.5 ? "on" : "off";
-  return String(v);
-}
-
-function drawMotion(st) {
-  const root = document.getElementById("motion-lanes");
-  if (!root) return;
-  const specs = window.RESAMPLE_MOTION_LANES || [];
-  const motion = st.motion || (window.ResampleLive && window.ResampleLive.motion);
-  if (!motion) return;
-  if (root.dataset.ready !== "3") {
-    root.dataset.ready = "3";
-    root.innerHTML = specs
-      .map(
-        (spec) => `
-      <div class="motion-lane" data-id="${spec.id}">
-        <label class="check"><input type="checkbox" class="motion-on" /> ${spec.label}</label>
-        <canvas class="motion-cv" height="80"></canvas>
-        <span class="motion-readout"></span>
-      </div>`
-      )
-      .join("");
-  }
-  const amber = getComputedStyle(document.documentElement).getPropertyValue("--amber").trim() || "#e8a23a";
-  const line = getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "#2c2a25";
-  const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#e8e2d6";
-  const dpr = window.devicePixelRatio || 1;
-  root.querySelectorAll(".motion-lane").forEach((row) => {
-    const id = row.dataset.id;
-    const lane = motion.lanes[id] || { on: false, a: 0, b: 0 };
-    const onEl = row.querySelector(".motion-on");
-    if (onEl && onEl.checked !== Boolean(lane.on)) onEl.checked = Boolean(lane.on);
-    row.classList.toggle("off", !lane.on);
-    const { min, max } = motionRange(id);
-    const a = lane.a == null ? min : lane.a;
-    const b = lane.b == null ? a : lane.b;
-    const read = row.querySelector(".motion-readout");
-    if (read) read.textContent = `${motionLabel(id, a)} → ${motionLabel(id, b)}`;
-    const canvas = row.querySelector(".motion-cv");
-    if (!canvas) return;
-    const cssW = canvas.clientWidth || 240;
-    const cssH = canvas.clientHeight || 72;
-    if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
-      canvas.width = Math.floor(cssW * dpr);
-      canvas.height = Math.floor(cssH * dpr);
-    }
-    const ctx = canvas.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cssW, cssH);
-    ctx.fillStyle = line;
-    ctx.fillRect(0, cssH / 2 - 1, cssW, 2);
-    const yAt = (v) => {
-      const span = Math.max(max - min, 0.0001);
-      const u = (v - min) / span;
-      return cssH - 7 - u * (cssH - 14);
-    };
-    const x0 = 10;
-    const x1 = cssW - 10;
-    ctx.beginPath();
-    ctx.moveTo(x0, yAt(a));
-    ctx.lineTo(x1, yAt(b));
-    ctx.strokeStyle = lane.on ? amber : line;
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-    const drawHandle = (x, y) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = lane.on ? amber : ink;
-      ctx.fill();
-    };
-    drawHandle(x0, yAt(a));
-    drawHandle(x1, yAt(b));
-    if (st.playing && lane.on) {
-      const t = st.motionT || 0;
-      const x = x0 + t * (x1 - x0);
-      ctx.fillStyle = ink;
-      ctx.fillRect(x, 2, 1, cssH - 4);
-    }
-    canvas._motion = { id, min, max };
-  });
-}
-
-function motionDragToValue(canvas, ev) {
-  const meta = canvas._motion;
-  if (!meta) return null;
-  const rect = canvas.getBoundingClientRect();
-  const y = ev.clientY - rect.top;
-  const u = 1 - (y - 7) / Math.max(rect.height - 14, 1);
-  const v = meta.min + Math.min(1, Math.max(0, u)) * (meta.max - meta.min);
-  const which = ev.clientX - rect.left < rect.width / 2 ? "a" : "b";
-  return { id: meta.id, which, value: meta.id === "reverse" ? (v >= 0.5 ? 1 : 0) : Math.round(v) };
-}
-
 window.drawWaveform = drawWaveform;
 window.drawStarChart = drawStarChart;
 window.drawHelm = drawHelm;
 window.drawSeqGrid = drawSeqGrid;
 window.nearestHelmHandle = nearestHelmHandle;
 window.helmDragToValue = helmDragToValue;
-window.drawMotion = drawMotion;
-window.motionDragToValue = motionDragToValue;
+window.axisLocked = axisLocked;

@@ -2,7 +2,7 @@
 
 Live melody-aware loop chopper for Ableton.
 
-Load a vocal, bass loop, or synth loop. Resampler finds the **notes**, not equal time slices. **Inspire** invents a loop that jumps around those notes. Pitch stays in key. Bounce a WAV into Session View. Percussion stays out.
+Load a vocal, bass loop, or synth loop. Resampler finds the **notes**, not equal time slices. **Resample** invents a loop that jumps around those notes. Pitch stays in key. Bounce a WAV into Session View. Percussion stays out.
 
 It is **not** Simpler and **not** a VST. Simpler chops time. Resampler chops the **melody**, then randomizes musically.
 
@@ -28,9 +28,9 @@ Open http://127.0.0.1:8787
 
 - Search the local Splice library (vocals + bass + synth; no perc)
 - **Use** a file → play with space
-- Drag the **control star** (speed, length, offset, pitch, pattern)
-- Ctrl+click / double-click a star point to **lock** it from Inspire
-- **Inspire** (or Ctrl+R) randomizes unlocked axes and starts the loop
+- Drag the **control star** (note length, clip width, offset, pitch, pattern, density)
+- Ctrl+click / double-click a star point to **lock** it from Resample
+- **Resample** (or Ctrl+R) randomizes unlocked axes and starts the loop
 - Ctrl+Z = undo last change
 - **Through** = play past the note end for the full step
 - Export WAV / **drag to Live** = bounce N bars (also written to `./out`)
@@ -41,22 +41,22 @@ Open http://127.0.0.1:8787
 | Key | Action |
 |-----|--------|
 | Space | Play / stop |
-| Ctrl+R | Inspire |
+| Ctrl+R | Resample |
 | Ctrl+Z | Undo last change |
 
 ## What the controls mean
 
 | Control | Meaning |
 |---------|---------|
-| **Speed** | Step rate (whole → 32nd). How fast the loop ticks. |
-| **Pattern** | Note order: lock, stutter-jump, hold-run, reverse, ping-pong, leap, scatter, call/response. |
-| **Length / offset** | Which *bars of the sample* you may steal notes from. |
+| **Note length** | Step size (half → 32nd). How long each hit lasts. |
+| **Pattern** | Note order: lock, stutter-jump, leap, hold-run, reverse, ping-pong, scatter, call/response. |
+| **Clip width / offset** | Which *bars of the sample* you may steal notes from. |
 | **Loop length** | How long the *idea* is (1 / 2 / 4 bars) before it repeats. |
 | **Pitch** | Transpose, only to scale degrees of the key dropdown. |
 | **Key** | Cages pitch. Auto-filled from Splice-style names (`_Am`, `_D#m`) when present; otherwise chroma. |
+| **Density** | How many steps fire. 100% is the full loop; lower leaves random steps silent. |
 | **Reverse / through / swing** | Flip each grain; play through note changes; delay odd steps. |
 | **Chance** | `%` row on the grid. That step can miss. |
-| **Automation** | Clip envelopes under the loop. Ramp speed or pitch over bars. |
 | **Kits** | Named snapshot of star + grid + feel. Lives in this browser. |
 
 The sequence grid **is** the loop. Click a cell to pick which note plays on that step.
@@ -79,8 +79,8 @@ Library folder is stored in `~/.resample/config.json`. A leftover `~/.voxloom/co
 ## Layout
 
 ```
-src/resample/           Python: analyze, notes, library, optional offline render
-src/resample/static/    Live UI: app.js (chrome), live.js (engine), viz.js (stars)
+src/resample/           Python: analyze, notes, library, preload cache, optional offline render
+src/resample/static/    Live UI: app.js (chrome), live.js (engine), viz.js (star + map)
 tests/                  Synthetic-tone + filename-key tests
 docs/ARCHITECTURE.md    How the pieces fit
 docs/FUTURE.md          Next ideas

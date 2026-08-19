@@ -195,7 +195,6 @@ SYNTH_TOKENS = {
     "atmosphere",
     "texture",
 }
-ONESHOT_TOKENS = {"oneshot", "oneshots", "shot", "shots", "hit", "hits"}
 LOOP_TOKENS = {"loop", "loops", "looped"}
 VOCAL_KINDS = {"vocal", "pad", "lead"}
 PITCHED_KINDS = VOCAL_KINDS | {"bass", "synth"}
@@ -322,10 +321,6 @@ def _place_tokens(pack: str, folders: list[str]) -> set[str]:
 
 def _is_loop(file_tok: set[str], place_tok: set[str]) -> bool:
     return bool((file_tok | place_tok) & LOOP_TOKENS)
-
-
-def _is_oneshot(file_tok: set[str], place_tok: set[str]) -> bool:
-    return bool((file_tok | place_tok) & ONESHOT_TOKENS)
 
 
 def _vocal_kind(file_tok: set[str], place_tok: set[str]) -> str:

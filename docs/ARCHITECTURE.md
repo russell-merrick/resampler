@@ -5,9 +5,9 @@ Two layers. The **live UI** is the product. Python analyzes audio and serves fil
 ```
 Splice disk → library.py search
                  ↓
-            webapp.py  analyze + detect_notes
+            webapp.py  analyze + detect_notes (+ preload cache)
                  ↓
-   live.js engine  ←  viz.js stars  ←  app.js chrome
+   live.js engine  ←  viz.js star/map  ←  app.js chrome
                  ↓
             bounce WAV
 ```
@@ -18,6 +18,7 @@ Splice disk → library.py search
 |--------|-----|
 | `webapp.py` | FastAPI: upload, Splice search, session WAV, optional `generate` |
 | `analyze.py` | Key (filename tag first, then chroma), BPM guess, pad/lead hint |
+| `preload.py` | JIT warmup + analysis cache so the first Use is not a stall |
 | `theory.py` | Scales, filename key tags (`_Am`), interval math |
 | `notes.py` | pYIN → sung-note segments (start/end/pitch class) |
 | `library.py` | Walk a Splice tree; keep vocals / bass / synth loops; drop perc |
@@ -31,21 +32,21 @@ Sessions live in the temp dir (`resample-sessions`). Library root is `~/.resampl
 
 | File | Job |
 |------|-----|
-| `live.js` | Web Audio scheduler. Note pool from the bar window. Patterns. Reverse + swing. Per-step chance. Automation ramps over bars. In-key pitch (`detune`). Bounce via `OfflineAudioContext`. |
-| `viz.js` | Control star (draggable + lock), pitch×time map, sequence grid, waveform. |
-| `app.js` | Splice UI, options/themes, shortcuts, Inspire/undo, kits, drag-export, wiring. |
-| `index.html` / `app.css` | Layout and themes (dark, light, neon, rainbow). |
+| `live.js` | Web Audio scheduler. Note pool from the bar window. Patterns. Reverse + swing. Density + per-step chance. In-key pitch (`detune`). Bounce via `OfflineAudioContext`. |
+| `viz.js` | Control star (draggable + lock), melody map (visual only), sequence grid, waveform. |
+| `app.js` | Splice UI, options/themes, shortcuts, Resample/undo, kits, drag-export, wiring. |
+| `index.html` / `app.css` | Layout and themes (dark, light, neon, rainbow, neon pink). |
 
-**Speed** = step size. **Pattern** = idea (leap, reverse, …). **Length/offset** = sample window in bars. **Loop length** = how many steps the idea occupies.
+**Note length** = step size. **Pattern** = idea (leap, reverse, …). **Clip width / offset** = sample window in bars. **Loop length** = how many steps the idea occupies. **Density** = how many of those steps fire.
 
-Inspire randomizes unlocked star axes, then starts playback. Ctrl+Z undoes the last edit (a star drag, slider, grid click, or Inspire). Kits persist the same snapshot in `localStorage`. Bounce writes a 24-bit WAV and also POSTs it to `./out` so you can drag a real file into Ableton if the browser drop is flaky.
+Resample randomizes unlocked star axes, then starts playback. Ctrl+Z undoes the last edit (a star drag, slider, grid click, or Resample). Kits persist the same snapshot in `localStorage`. Bounce writes a 24-bit WAV and also POSTs it to `./out` so you can drag a real file into Ableton if the browser drop is flaky.
 
 ## What we did *not* reorganize
 
 - Offline `generate` / recipes stay. Harmless, still useful from the CLI.
-- `app.js` is large (~750 lines) but is one chrome layer. Split later only if a second page appears.
+- `app.js` is one chrome layer. Split later only if a second page appears.
 - Keep analysis on the server (librosa/pYIN). Do not port that to the browser.
 
 ## Tests
 
-Pytest on theory, filename keys, note splits, gate/slice, pitch cents, library classify. No JS tests yet.
+Pytest on theory, filename keys, note splits, gate/slice, pitch cents, library classify, preload cache. No JS tests yet.

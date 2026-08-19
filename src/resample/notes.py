@@ -84,7 +84,7 @@ def detect_notes(
             frames.append(float(m))
     flush(len(midi) - 1)
 
-    notes = _merge_same_pitch(raw)
+    notes = _drop_quiet_starts(mono, sample_rate, _merge_same_pitch(raw))
     unique: list[str] = []
     for note in notes:
         if note["pc"] not in unique:
@@ -109,3 +109,38 @@ def _merge_same_pitch(notes: list[dict], gap: float = 0.06) -> list[dict]:
         else:
             out.append(dict(note))
     return out
+
+
+def _drop_quiet_starts(
+    mono: np.ndarray,
+    sample_rate: int,
+    notes: list[dict],
+    *,
+    start_ms: float = 50.0,
+    floor_db: float = -28.0,
+) -> list[dict]:
+    """Keep a note if its start-window RMS is loud enough vs the clip peak.
+
+    Peak-of-start lets reverb/hiss through (a −25 dB spike in a −36 dB gap).
+    Tails after a loud attack are kept.
+    """
+    if not notes or mono.size == 0:
+        return []
+    peak = float(np.max(np.abs(mono)))
+    if peak < 1e-9:
+        return []
+    floor = peak * (10.0 ** (floor_db / 20.0))
+    win = max(int(sample_rate * start_ms / 1000.0), 1)
+    kept: list[dict] = []
+    for note in notes:
+        a = int(round(float(note["start"]) * sample_rate))
+        b = int(round(float(note["end"]) * sample_rate))
+        a = max(0, min(a, mono.size - 1))
+        b = max(a + 1, min(b, mono.size))
+        head = mono[a : min(a + win, b)]
+        if not head.size:
+            continue
+        start_rms = float(np.sqrt(np.mean(np.square(head))))
+        if start_rms >= floor:
+            kept.append(note)
+    return kept

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from resample.models import Engine, GatePattern, Job, PitchMode, SliceMethod, VoiceMode
 
@@ -10,7 +10,6 @@ from resample.models import Engine, GatePattern, Job, PitchMode, SliceMethod, Vo
 def _pat(name: str, bits: str, resolution: str = "1/16", **kwargs) -> GatePattern:
     steps = [ch == "1" for ch in bits.replace(" ", "")]
     ties = [False] * len(steps)
-    # Tie runs of 1s that are written as longer hits via '=' in bits? Keep simple: consecutive 1s retrigger unless '*'.
     return GatePattern(name=name, steps=steps, ties=ties, resolution=resolution, **kwargs)
 
 
@@ -173,7 +172,3 @@ def job_from_recipe(
         n_takes=n_takes,
         seed=seed,
     )
-
-
-def with_pattern(job: Job, pattern: GatePattern) -> Job:
-    return replace(job, pattern=pattern)

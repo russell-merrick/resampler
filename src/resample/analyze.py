@@ -89,12 +89,13 @@ def suggest_voice_mode(mono: np.ndarray, sample_rate: int) -> tuple[VoiceMode, f
 
 def analyze_audio(audio: np.ndarray, sample_rate: int, name: str | None = None) -> Analysis:
     mono = to_mono(audio)
-    root, mode, confidence, alt = estimate_key(mono, sample_rate)
     tagged = key_from_filename(name) if name else None
     if tagged:
         root, mode = tagged
         confidence = 1.0
         alt = [{"root": root, "mode": mode, "score": 1.0, "source": "filename"}]
+    else:
+        root, mode, confidence, alt = estimate_key(mono, sample_rate)
     voice, onset_rate = suggest_voice_mode(mono, sample_rate)
     return Analysis(
         sample_rate=sample_rate,

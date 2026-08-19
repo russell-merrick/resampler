@@ -161,11 +161,6 @@ def key_label(root: str, scale: str) -> str:
     return f"{normalize_root(root)}{short}"
 
 
-def scale_degrees(root: str, scale: str) -> list[int]:
-    tonic = pc_index(root)
-    return [(tonic + step) % 12 for step in SCALES[normalize_scale(scale)]]
-
-
 def rotate(values: list[float], n: int) -> list[float]:
     n = n % len(values)
     return values[-n:] + values[:-n] if n else list(values)

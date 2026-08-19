@@ -5,6 +5,18 @@ from resample.analyze import analyze_audio, estimate_key, suggest_voice_mode
 from resample.models import VoiceMode
 
 
+def test_filename_key_skips_chroma(monkeypatch) -> None:
+    def boom(*_args, **_kwargs):
+        raise AssertionError("chroma should not run when the filename has a key")
+
+    monkeypatch.setattr("resample.analyze.estimate_key", boom)
+    audio = sine(220.0, 0.4)
+    analysis = analyze_audio(audio[None, :], 22050, name="91V_BPT_100_vocal_loop_wet_D#m.wav")
+    assert analysis.key_root == "D#"
+    assert analysis.key_mode == "minor"
+    assert analysis.key_confidence == 1.0
+
+
 def test_c_major_triad() -> None:
     audio = chord([261.63, 329.63, 392.00], seconds=2.5)
     analysis = analyze_audio(audio[None, :], 22050)

@@ -1,11 +1,11 @@
 # Next
 
-Resampler is a **melody-aware live chopper**. It already has Inspire, locks, a control star, a note map, and WAV bounce. Do not grow into a DAW or a sample store.
+Resampler is a **melody-aware live chopper**. It already has Resample, locks, a control star, a note map, and WAV bounce. Do not grow into a DAW or a sample store.
 
 ## Done (was “next” last time)
 
 - Sung-note detection (not equal slices)
-- Inspire / constrained random on the star
+- Resample / constrained random on the star
 - Axis locks (Ctrl+click / double-click)
 - Loop grid as the editable sequence
 - Filename key tags (`_Am`)
@@ -18,11 +18,12 @@ Resampler is a **melody-aware live chopper**. It already has Inspire, locks, a c
 3. **Drag the bounced WAV** into Live (button + `out/` folder; download still works).
 4. **Named kits** — save star + grid + feel as “UKG lock” in localStorage.
 5. **Chance per step** — `%` row on the loop grid. Click 100→75→50→25→0 or drag. Miss = silence. Bounce re-rolls.
-6. **Automation** — lanes under the loop. Ramp speed or pitch over 1–16 bars.
+6. **Density** — control-star axis + Resample roll. How many steps fire this loop.
 
 ## Ditched
 
-- **History strip** — Ctrl+Z is enough. Do not add an inspire chip row.
+- **History strip** — Ctrl+Z is enough. Do not add a resample chip row.
+- **Automation lanes** — ramps under the loop. Pulled; density + chance cover the job.
 
 ## Bigger, still on-mission
 

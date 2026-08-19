@@ -6,6 +6,7 @@ import json
 import shutil
 import tempfile
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
@@ -13,7 +14,6 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from resample.analyze import analyze_file
-from resample.notes import detect_notes
 from resample.library import (
     detect_splice_roots,
     load_config,
@@ -25,6 +25,7 @@ from resample.library import (
 from resample.models import Engine, PitchMode, VoiceMode
 from resample.recipes import PATTERNS, get_recipe, job_from_recipe, list_recipes, pattern_by_name
 from resample.render import generate_takes
+from resample.preload import analyze_cached, enqueue_prefetch, start_preload_worker, stop_preload_worker, warmed
 from resample.theory import parse_key
 
 STATIC = Path(__file__).parent / "static"
@@ -33,7 +34,15 @@ ROOT.mkdir(parents=True, exist_ok=True)
 EXPORT = Path.cwd() / "out"
 EXPORT.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="Resampler", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    start_preload_worker()
+    yield
+    stop_preload_worker()
+
+
+app = FastAPI(title="Resampler", version="0.1.0", lifespan=lifespan)
 
 
 def _session_dir(session_id: str) -> Path:
@@ -72,23 +81,17 @@ def _analysis_payload(session_id: str, filename: str, analysis, notes: dict | No
     }
 
 
-def _analyze_with_notes(path: Path, name: str | None = None):
-    audio, analysis = analyze_file(path, name=name)
-    try:
-        notes = detect_notes(audio, analysis.sample_rate)
-    except Exception:
-        notes = {"notes": [], "unique": [], "count": 0}
-    return analysis, notes
-
-
 def _open_path_as_session(src: Path) -> dict:
+    try:
+        analysis, notes = analyze_cached(src, name=src.name)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Could not read audio: {exc}") from exc
     session_id = uuid.uuid4().hex[:12]
     dest = ROOT / session_id
     dest.mkdir(parents=True, exist_ok=True)
     copied = dest / f"source{src.suffix.lower() or '.wav'}"
-    shutil.copy2(src, copied)
     try:
-        analysis, notes = _analyze_with_notes(copied, name=src.name)
+        shutil.copy2(src, copied)
     except Exception as exc:  # noqa: BLE001
         shutil.rmtree(dest, ignore_errors=True)
         raise HTTPException(400, f"Could not read audio: {exc}") from exc
@@ -102,7 +105,12 @@ def health() -> dict:
     from resample.pitch import get_engine
 
     engine = get_engine()
-    return {"ok": True, "pitch_backend": engine.backend.name, "license": engine.backend.license}
+    return {
+        "ok": True,
+        "pitch_backend": engine.backend.name,
+        "license": engine.backend.license,
+        "analyzer_ready": warmed(),
+    }
 
 
 @app.get("/api/recipes")
@@ -143,7 +151,7 @@ async def analyze(file: UploadFile = File(...)) -> dict:
     src_path = dest / f"source{suffix}"
     src_path.write_bytes(await file.read())
     try:
-        analysis, notes = _analyze_with_notes(src_path, name=file.filename)
+        analysis, notes = analyze_cached(src_path, name=file.filename)
     except Exception as exc:  # noqa: BLE001
         shutil.rmtree(dest, ignore_errors=True)
         raise HTTPException(400, f"Could not read audio: {exc}") from exc
@@ -210,6 +218,22 @@ def library_file(path: str, root: str = "") -> FileResponse:
     except PermissionError as exc:
         raise HTTPException(403, str(exc)) from exc
     return FileResponse(target, filename=target.name)
+
+
+@app.post("/api/library/prefetch")
+def library_prefetch(
+    path: str = Form(...),
+    root: str = Form(""),
+    priority: int = Form(2),
+) -> dict:
+    try:
+        target = resolve_under_root(path, _roots_with_optional(root))
+    except FileNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    enqueue_prefetch(target, priority=priority)
+    return {"ok": True, "queued": True}
 
 
 @app.post("/api/library/open")

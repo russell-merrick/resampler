@@ -1,23 +1,28 @@
-/** Chrome: Splice library, options/themes, shortcuts, Inspire/undo, wiring to live.js. */
+/** Chrome: Splice library, options/themes, shortcuts, Resample/undo, wiring to live.js. */
 
 const $ = (id) => document.getElementById(id);
 
-const state = { session: null, libTimer: null, analysis: null };
-window.RESAMPLE_LOCKS = { speed: false, length: false, offset: false, pitch: false, pattern: false };
+const state = { libTimer: null, analysis: null };
+window.RESAMPLE_LOCKS = { speed: false, length: false, offset: false, pitch: false, pattern: false, density: false };
 const live = window.ResampleLive;
 const PREFS_KEY = "resample-options";
 
 function loadPrefs() {
   try {
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
+    const { autoInspire, ...rest } = raw;
     return {
       theme: "dark",
       bpm: 128,
       loopBars: 1,
-      autoInspire: false,
-      ...JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"),
+      autoResample: false,
+      funMode: false,
+      triplets: false,
+      ...rest,
+      autoResample: Boolean(raw.autoResample ?? autoInspire),
     };
   } catch {
-    return { theme: "dark", bpm: 128, loopBars: 1, autoInspire: false };
+    return { theme: "dark", bpm: 128, loopBars: 1, autoResample: false, funMode: false, triplets: false };
   }
 }
 
@@ -35,6 +40,7 @@ async function boot() {
   const prefs = loadPrefs();
   applyTheme(prefs.theme);
   bindCreeper();
+  bindCats();
   bindOptions();
   bindSteppers();
   bindDeck();
@@ -87,7 +93,10 @@ function bindOptions() {
   $("opt-theme").value = prefs.theme;
   $("opt-bpm").value = String(prefs.bpm);
   $("opt-loop").value = String(prefs.loopBars);
-  $("opt-auto-inspire").checked = Boolean(prefs.autoInspire);
+  $("opt-auto-resample").checked = Boolean(prefs.autoResample);
+  if ($("opt-triplets")) $("opt-triplets").checked = Boolean(prefs.triplets);
+  applyTripletsPref(Boolean(prefs.triplets));
+  applyFunMode(Boolean(prefs.funMode));
   const open = () => {
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
@@ -103,6 +112,12 @@ function bindOptions() {
   });
   $("opt-theme").addEventListener("change", () => {
     const theme = $("opt-theme").value;
+    if (theme === "pink") {
+      $("opt-theme").value = loadPrefs().theme || "dark";
+      close();
+      runPinkFlash();
+      return;
+    }
     applyTheme(theme);
     savePrefs({ theme });
   });
@@ -112,9 +127,245 @@ function bindOptions() {
   $("opt-loop").addEventListener("change", () => {
     savePrefs({ loopBars: Number($("opt-loop").value) || 1 });
   });
-  $("opt-auto-inspire").addEventListener("change", () => {
-    savePrefs({ autoInspire: $("opt-auto-inspire").checked });
+  $("opt-auto-resample").addEventListener("change", () => {
+    savePrefs({ autoResample: $("opt-auto-resample").checked });
   });
+  if ($("opt-triplets")) {
+    $("opt-triplets").addEventListener("change", () => {
+      savePrefs({ triplets: $("opt-triplets").checked });
+      applyTripletsPref($("opt-triplets").checked);
+    });
+  }
+  if ($("fun-mode")) {
+    $("fun-mode").addEventListener("click", () => {
+      applyFunMode(!loadPrefs().funMode);
+    });
+  }
+}
+
+function applyTripletsPref(on) {
+  window.RESAMPLE_ALLOW_TRIPLETS = Boolean(on);
+  if (live && live.set) live.set({ speedIndex: live.params.speedIndex });
+  syncSpeedControl();
+  if (typeof paintLabels === "function") paintLabels();
+}
+
+function speedAllowed() {
+  if (window.allowedSpeedIndices) return window.allowedSpeedIndices();
+  return [1, 2, 3, 5, 7];
+}
+
+function syncSpeedControl() {
+  const el = $("speed");
+  const ticks = $("speed-ticks");
+  const lengths = window.RESAMPLE_NOTE_LENGTHS || [];
+  const allowed = speedAllowed();
+  if (el) {
+    el.max = String(Math.max(allowed.length - 1, 0));
+    let pos = allowed.indexOf(live.params.speedIndex);
+    if (pos < 0) {
+      const snapped = window.nearestAllowedSpeed
+        ? window.nearestAllowedSpeed(live.params.speedIndex)
+        : allowed[0];
+      live.set({ speedIndex: snapped });
+      pos = allowed.indexOf(live.params.speedIndex);
+    }
+    if (pos >= 0) el.value = String(pos);
+  }
+  if (ticks) {
+    const short = {
+      half: "1/2",
+      quarter: "1/4",
+      "8th": "1/8",
+      "8th trip": "8t",
+      "16th": "1/16",
+      "16th trip": "16t",
+      "32nd": "1/32",
+    };
+    ticks.innerHTML = allowed
+      .map((i) => `<i>${short[lengths[i]?.label] || lengths[i]?.id || ""}</i>`)
+      .join("");
+  }
+}
+
+function syncPatternTicks() {
+  const ticks = $("pattern-ticks");
+  const ids = window.RESAMPLE_IDEA_IDS || [];
+  const ideas = window.RESAMPLE_IDEAS || {};
+  if (!ticks || !ids.length) return;
+  ticks.innerHTML = ids.map((id) => `<i>${ideas[id]?.tick || id}</i>`).join("");
+}
+
+function applyFunMode(on) {
+  savePrefs({ funMode: Boolean(on) });
+  const btn = $("fun-mode");
+  const toys = $("fun-toys");
+  if (btn) btn.classList.toggle("on", on);
+  if (toys) toys.classList.toggle("hidden", !on);
+}
+
+function bindCats() {
+  const btn = $("cats-best");
+  const overlay = $("cats-boom");
+  const close = $("cats-close");
+  const canvas = $("cats-fireworks");
+  if (!btn || !overlay) return;
+  let fireworks = null;
+  const hide = () => {
+    if (fireworks) fireworks.stop();
+    fireworks = null;
+    overlay.classList.add("hidden");
+    overlay.setAttribute("aria-hidden", "true");
+  };
+  btn.addEventListener("click", () => {
+    overlay.classList.remove("hidden");
+    overlay.setAttribute("aria-hidden", "false");
+    if (canvas) fireworks = startFireworks(canvas);
+    playMeow().catch(() => {});
+  });
+  if (close) close.addEventListener("click", hide);
+}
+
+function runPinkFlash() {
+  const el = $("pink-flash");
+  const canvas = $("pink-fireworks");
+  if (!el) return;
+  el.classList.remove("hidden", "to-white");
+  el.setAttribute("aria-hidden", "false");
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => el.classList.add("to-white"));
+  });
+  const fw = canvas
+    ? startFireworks(canvas, ["#1a4cff", "#3d7dff", "#6ec8ff", "#b8e4ff", "#ffffff", "#7aa8ff"])
+    : null;
+  setTimeout(() => {
+    if (fw) fw.stop();
+    el.classList.add("hidden");
+    el.classList.remove("to-white");
+    el.setAttribute("aria-hidden", "true");
+  }, 3200);
+}
+
+function startFireworks(canvas, palette) {
+  const ctx = canvas.getContext("2d");
+  const colors = palette || ["#fff36a", "#ff4da6", "#ff9ad4", "#7ec8ff", "#ffffff", "#ffd14a"];
+  let rockets = [];
+  let sparks = [];
+  let running = true;
+  let nextAt = 0;
+  const resize = () => {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  };
+  resize();
+  const burst = (x, y, color) => {
+    const n = 36 + Math.floor(Math.random() * 24);
+    for (let i = 0; i < n; i += 1) {
+      const a = (Math.PI * 2 * i) / n + Math.random() * 0.2;
+      const s = 1.6 + Math.random() * 3.8;
+      sparks.push({
+        x,
+        y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s,
+        life: 1,
+        decay: 0.012 + Math.random() * 0.018,
+        color: Math.random() < 0.35 ? "#fff7c2" : color,
+        r: 1.4 + Math.random() * 1.8,
+      });
+    }
+  };
+  const launch = () => {
+    const w = canvas.width;
+    const h = canvas.height;
+    rockets.push({
+      x: w * (0.12 + Math.random() * 0.76),
+      y: h + 8,
+      vx: (Math.random() - 0.5) * 1.4,
+      vy: -(4.8 + Math.random() * 3.2),
+      color: colors[Math.floor(Math.random() * colors.length)],
+      fuse: 0.42 + Math.random() * 0.22,
+    });
+  };
+  const tick = () => {
+    if (!running) return;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const now = performance.now();
+    if (now > nextAt) {
+      launch();
+      if (Math.random() < 0.45) launch();
+      nextAt = now + 280 + Math.random() * 420;
+    }
+    rockets = rockets.filter((rk) => {
+      rk.x += rk.vx;
+      rk.y += rk.vy;
+      rk.vy += 0.045;
+      rk.fuse -= 0.016;
+      ctx.fillStyle = rk.color;
+      ctx.fillRect(rk.x, rk.y, 2, 8);
+      if (rk.fuse <= 0 || rk.vy > -0.4) {
+        burst(rk.x, rk.y, rk.color);
+        return false;
+      }
+      return rk.y > -20;
+    });
+    sparks = sparks.filter((sp) => {
+      sp.x += sp.vx;
+      sp.y += sp.vy;
+      sp.vy += 0.04;
+      sp.vx *= 0.985;
+      sp.life -= sp.decay;
+      if (sp.life <= 0) return false;
+      ctx.globalAlpha = Math.max(0, sp.life);
+      ctx.fillStyle = sp.color;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      return true;
+    });
+    requestAnimationFrame(tick);
+  };
+  window.addEventListener("resize", resize);
+  requestAnimationFrame(tick);
+  return {
+    stop() {
+      running = false;
+      window.removeEventListener("resize", resize);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    },
+  };
+}
+
+async function playMeow() {
+  const ctx = new AudioContext();
+  if (ctx.state === "suspended") await ctx.resume();
+  const now = ctx.currentTime;
+  const dur = 0.55;
+  const osc = ctx.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(980, now);
+  osc.frequency.exponentialRampToValueAtTime(420, now + 0.22);
+  osc.frequency.exponentialRampToValueAtTime(620, now + 0.38);
+  osc.frequency.exponentialRampToValueAtTime(280, now + dur);
+  const filt = ctx.createBiquadFilter();
+  filt.type = "bandpass";
+  filt.Q.value = 6;
+  filt.frequency.setValueAtTime(1400, now);
+  filt.frequency.exponentialRampToValueAtTime(700, now + dur);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.28, now + 0.04);
+  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.28);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  osc.connect(filt);
+  filt.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + dur + 0.02);
+  await new Promise((r) => setTimeout(r, dur * 1000));
 }
 
 function bindCreeper() {
@@ -232,7 +483,6 @@ async function runLibrarySearch() {
   const params = new URLSearchParams({
     q,
     kind,
-    vocals: "false",
     limit: "80",
   });
   if (root) params.set("root", root);
@@ -256,6 +506,21 @@ async function runLibrarySearch() {
       </li>`
     )
     .join("");
+  prefetchLibraryHits(data.hits);
+}
+
+function prefetchLibraryHits(hits, priority = 2) {
+  for (const h of (hits || []).slice(0, 10)) {
+    prefetchLibraryPath(h.path, priority);
+  }
+}
+
+function prefetchLibraryPath(path, priority = 2) {
+  const body = new FormData();
+  body.append("path", path);
+  body.append("root", $("lib-root").value.trim());
+  body.append("priority", String(priority));
+  fetch("/api/library/prefetch", { method: "POST", body }).catch(() => {});
 }
 
 function escapeHtml(value) {
@@ -356,6 +621,7 @@ $("lib-hits").addEventListener("click", async (e) => {
     }
     const root = encodeURIComponent($("lib-root").value.trim());
     libPlayer.src = `/api/library/file?path=${encodeURIComponent(path)}&root=${root}`;
+    prefetchLibraryPath(path, 1);
     await libPlayer.play();
     markLibPlaying(path);
     return;
@@ -397,7 +663,6 @@ async function applyAnalysis(data) {
   live.stop();
   $("play").textContent = "▶ play";
   $("play").classList.remove("on");
-  state.session = data.session_id;
   state.analysis = data;
   $("workspace").classList.remove("hidden");
   stopLibPreview();
@@ -419,9 +684,9 @@ async function applyAnalysis(data) {
     syncOffsetSlider();
     $("play").disabled = false;
     paintLabels();
-    if (loadPrefs().autoInspire && window.rollInspire) window.rollInspire();
+    if (loadPrefs().autoResample && window.rollResample) window.rollResample();
     $("status").textContent = data.notes?.length
-      ? `found ${data.notes.length} notes — inspire or play`
+      ? `found ${data.notes.length} notes — resample or play`
       : "no sung notes found — using grid";
     $("workspace").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
@@ -469,7 +734,7 @@ function readSliders() {
   const lengths = window.RESAMPLE_LENGTH_BARS;
   return {
     bpm: Number($("bpm").value) || 128,
-    patternIndex: Number($("speed").value),
+    speedIndex: speedAllowed()[Number($("speed").value)] ?? live.params.speedIndex,
     ideaId: (window.RESAMPLE_IDEA_IDS || [])[Number($("pattern").value)] || "lock",
     lengthBars: lengths[Number($("length").value)] ?? 2,
     offsetBars: Number($("offset").value) || 0,
@@ -478,6 +743,7 @@ function readSliders() {
     reverse: Boolean($("reverse") && $("reverse").checked),
     through: Boolean($("through") && $("through").checked),
     swing: Number($("swing")?.value || 0) / 100,
+    density: (Number($("density")?.value) || 10) / 10,
   };
 }
 
@@ -486,7 +752,7 @@ function bounceName() {
   const key = `${live.keyRoot.replace("#", "s")}${
     live.keyMode === "major" ? "maj" : live.keyMode === "minor" ? "min" : live.keyMode
   }`;
-  return `${["resample", stem, key, live.pattern().id.replace("/", ""), `${Math.round(live.params.bpm)}bpm`].join("_").replace(/[^\w.-]+/g, "_")}.wav`;
+  return `${["resample", stem, key, live.noteLength().id.replace("/", ""), `${Math.round(live.params.bpm)}bpm`].join("_").replace(/[^\w.-]+/g, "_")}.wav`;
 }
 
 const bounceCache = { key: "", file: null, name: "" };
@@ -495,6 +761,8 @@ function bounceFingerprint() {
   return JSON.stringify({
     sliders: readSliders(),
     sequence: live.sequence,
+    spans: live.spans,
+    densityMask: live.densityMask,
     idea: live.idea,
     bars: Number($("bars")?.value) || 4,
     key: [live.keyRoot, live.keyMode],
@@ -524,16 +792,26 @@ async function saveBounceToOut(file, name) {
 }
 
 function paintLabels() {
-  const p = window.RESAMPLE_PATTERNS[Number($("speed").value)];
+  const noteLen = live.noteLength();
   const st = live.status();
-  if ($("speed-val")) $("speed-val").textContent = p ? p.label : "";
+  if ($("speed-val")) $("speed-val").textContent = noteLen ? noteLen.label : "";
   const ideaSpec = window.RESAMPLE_IDEAS && window.RESAMPLE_IDEAS[st.idea];
   if ($("pattern-val")) $("pattern-val").textContent = ideaSpec ? ideaSpec.label : st.idea || "—";
   syncIdeaSlider(st.idea);
   $("len-val").textContent = `${st.lengthBars} bar${st.lengthBars === 1 ? "" : "s"}`;
   $("off-val").textContent = `bar ${st.offsetBars + 1}`;
   if ($("swing-val")) $("swing-val").textContent = `${Math.round((st.swing || 0) * 100)}%`;
-  ["speed", "length", "offset", "pitch", "pattern"].forEach((id) => {
+  if ($("density") && st.density != null) {
+    const ticks = String(Math.min(10, Math.max(1, Math.round((st.density ?? 1) * 10) || 1)));
+    if ($("density").value !== ticks) $("density").value = ticks;
+  }
+  if ($("density-val")) {
+    const mask = st.densityMask || [];
+    const n = mask.length || st.loopSteps || 0;
+    const on = mask.reduce((a, v) => a + (v ? 1 : 0), 0);
+    $("density-val").textContent = `${n ? Math.round((on / n) * 100) : Math.round((st.density ?? 1) * 100)}%`;
+  }
+  ["speed", "length", "offset", "pitch", "pattern", "density"].forEach((id) => {
     const el = $(id);
     if (el) el.disabled = Boolean(window.RESAMPLE_LOCKS[id]);
   });
@@ -547,10 +825,9 @@ function paintLabels() {
   if (window.drawStarChart) window.drawStarChart(st);
   if (window.drawHelm) window.drawHelm(st);
   if (window.drawSeqGrid) window.drawSeqGrid(st);
-  if (window.drawMotion) window.drawMotion(st);
   const loopBits = $("loop-label");
   if (loopBits && st.loopSteps) {
-    loopBits.textContent = `this loop is ${st.loopBars} bar${st.loopBars === 1 ? "" : "s"} · ${st.loopSteps} steps of ${st.pattern.label}`;
+    loopBits.textContent = `this loop is ${st.loopBars} bar${st.loopBars === 1 ? "" : "s"} · ${st.loopSteps} steps of ${st.noteLength.label}`;
   }
   if (st.ready) {
     const n = st.notes[st.slice];
@@ -562,16 +839,11 @@ function paintLabels() {
       .filter(Boolean)
       .join(" · ");
     $("status").textContent = st.playing
-      ? `${st.idea ? `${st.idea} · ` : ""}${p.label} · ${n ? n.name : `slice ${st.slice + 1}`}${feel ? ` · ${feel}` : ""}`
+      ? `${st.idea ? `${st.idea} · ` : ""}${noteLen.label} · ${n ? n.name : `slice ${st.slice + 1}`}${feel ? ` · ${feel}` : ""}`
       : st.notes.length
-        ? `${st.notes.length} notes · hit inspire`
-        : `${st.slices} slices · ${p.label}`;
+        ? `${st.notes.length} notes · hit resample`
+        : `${st.slices} slices · ${noteLen.label}`;
   }
-}
-
-function sliderValue(id) {
-  if (id === "reverse") return $("reverse") && $("reverse").checked ? 1 : 0;
-  return Number($(id)?.value || 0);
 }
 
 function drawNotes(st) {
@@ -599,6 +871,8 @@ function fillKeySelects() {
 
 function bindDeck() {
   fillKeySelects();
+  syncSpeedControl();
+  syncPatternTicks();
   live.onTick = () => paintLabels();
 
   const apply = () => {
@@ -609,6 +883,7 @@ function bindDeck() {
 
   const captureState = () => ({
     speed: $("speed").value,
+    speedIndex: live.params.speedIndex,
     length: $("length").value,
     offset: $("offset").value,
     pitch: $("pitch").value,
@@ -617,20 +892,25 @@ function bindDeck() {
     reverse: Boolean($("reverse") && $("reverse").checked),
     through: Boolean($("through") && $("through").checked),
     swing: $("swing") ? $("swing").value : "0",
+    density: $("density") ? $("density").value : "10",
+    densityMask: live.densityMask.slice(),
     bpm: $("bpm").value,
     keyRoot: $("key-root").value,
     keyMode: $("key-mode").value,
     idea: live.idea,
     sequence: live.sequence.slice(),
     chance: live.fitChance().slice(),
-    motion: JSON.parse(JSON.stringify(live.motion)),
+    spans: live.fitSpans().slice(),
     locks: { ...window.RESAMPLE_LOCKS },
   });
 
   let restoring = false;
   const restoreState = (prev) => {
     restoring = true;
-    $("speed").value = prev.speed;
+    if (prev.speedIndex != null) live.params.speedIndex = Number(prev.speedIndex);
+    else if (prev.patternIndex != null) live.params.speedIndex = Number(prev.patternIndex);
+    else if (prev.speed != null) live.params.speedIndex = Number(prev.speed);
+    syncSpeedControl();
     $("length").value = prev.length;
     $("offset").value = prev.offset;
     $("pitch").value = prev.pitch;
@@ -639,6 +919,7 @@ function bindDeck() {
     if ($("reverse")) $("reverse").checked = Boolean(prev.reverse);
     if ($("through")) $("through").checked = Boolean(prev.through);
     if ($("swing") && prev.swing != null) $("swing").value = prev.swing;
+    if ($("density") && prev.density != null) $("density").value = prev.density;
     if (prev.bpm) $("bpm").value = prev.bpm;
     if (prev.keyRoot) $("key-root").value = prev.keyRoot;
     if (prev.keyMode) $("key-mode").value = prev.keyMode;
@@ -648,9 +929,10 @@ function bindDeck() {
     if (prev.idea) live.idea = prev.idea;
     if (prev.sequence) live.sequence = prev.sequence.slice();
     if (prev.chance) live.chance = live.fitChance(prev.chance);
-    if (prev.motion) live.motion = JSON.parse(JSON.stringify(prev.motion));
-    if ($("motion-bars") && live.motion.bars) $("motion-bars").value = String(live.motion.bars);
-    if ($("motion-loop")) $("motion-loop").checked = live.motion.loop !== false;
+    if (prev.spans) live.spans = live.fitSpans(prev.spans);
+    else live.spans = live.fitSpans([]);
+    if (prev.densityMask) live.fitDensityMask({ mask: prev.densityMask });
+    else if (prev.density == null) live.fitDensityMask({ mask: [] });
     paintLabels();
     restoring = false;
   };
@@ -671,7 +953,7 @@ function bindDeck() {
     restoreState(prev);
   };
 
-  ["speed", "pattern", "length", "offset", "pitch", "swing"].forEach((id) => {
+  ["speed", "pattern", "length", "offset", "pitch", "swing", "density"].forEach((id) => {
     const el = $(id);
     if (!el) return;
     el.addEventListener("pointerdown", snapshot);
@@ -708,11 +990,11 @@ function bindDeck() {
   const helm = $("helm");
   if (helm) {
     let dragAxis = null;
-    const axisLocked = (axis) => {
+    const axisLocked = window.axisLocked || ((axis) => {
       if (!axis) return false;
       const locks = window.RESAMPLE_LOCKS || {};
       return Boolean(locks[axis.id] || locks[axis.slider]);
-    };
+    });
     const pull = (e) => {
       if (!dragAxis || axisLocked(dragAxis)) return;
       const value = window.helmDragToValue(helm, e, dragAxis);
@@ -775,87 +1057,86 @@ function bindDeck() {
     });
   }
 
-  if ($("motion-bars")) {
-    $("motion-bars").addEventListener("change", () => {
-      snapshot();
-      live.motion.bars = Number($("motion-bars").value) || 4;
-      paintLabels();
-    });
-  }
-  if ($("motion-loop")) {
-    $("motion-loop").addEventListener("change", () => {
-      snapshot();
-      live.motion.loop = $("motion-loop").checked;
-      paintLabels();
-    });
-  }
-  const motionRoot = $("motion-lanes");
-  if (motionRoot) {
-    let drag = null;
-    motionRoot.addEventListener("change", (e) => {
-      const box = e.target.closest(".motion-on");
-      if (!box) return;
-      const id = box.closest(".motion-lane")?.dataset.id;
-      if (!id) return;
-      snapshot();
-      live.armLane(id, box.checked, sliderValue(id));
-      if (!box.checked) live.writeLane(id, sliderValue(id));
-      paintLabels();
-    });
-    motionRoot.addEventListener("pointerdown", (e) => {
-      const canvas = e.target.closest(".motion-cv");
-      if (!canvas) return;
-      const hit = window.motionDragToValue && window.motionDragToValue(canvas, e);
-      if (!hit) return;
-      snapshot();
-      drag = { canvas };
-      canvas.setPointerCapture(e.pointerId);
-      live.setLaneHandle(hit.id, hit.which, hit.value);
-      paintLabels();
-    });
-    motionRoot.addEventListener("pointermove", (e) => {
-      if (!drag) return;
-      const hit = window.motionDragToValue && window.motionDragToValue(drag.canvas, e);
-      if (!hit) return;
-      live.setLaneHandle(hit.id, hit.which, hit.value);
-      paintLabels();
-    });
-    motionRoot.addEventListener("pointerup", () => {
-      drag = null;
-    });
-    motionRoot.addEventListener("pointercancel", () => {
-      drag = null;
-    });
-  }
-
   const grid = $("seq-grid");
   if (grid) {
     let chanceDrag = null;
+    let noteDrag = null;
+    const stepFromEvent = (e) => {
+      const row = grid.querySelector(".seq-row:not(.chance-row)");
+      if (!row) return null;
+      const cells = row.querySelectorAll(".cell");
+      if (!cells.length) return null;
+      const first = cells[0].getBoundingClientRect();
+      const last = cells[cells.length - 1].getBoundingClientRect();
+      const t = (e.clientX - first.left) / Math.max(last.right - first.left, 1);
+      return Math.min(cells.length - 1, Math.max(0, Math.floor(t * cells.length)));
+    };
     grid.addEventListener("pointerdown", (e) => {
       const pad = e.target.closest(".chance");
-      if (!pad) return;
+      if (pad) {
+        e.preventDefault();
+        snapshot();
+        chanceDrag = { step: Number(pad.dataset.step), y: e.clientY, moved: false, el: pad };
+        pad.setPointerCapture(e.pointerId);
+        return;
+      }
+      const cell = e.target.closest(".cell");
+      if (!cell) return;
       e.preventDefault();
       snapshot();
-      chanceDrag = { step: Number(pad.dataset.step), y: e.clientY, moved: false, el: pad };
-      pad.setPointerCapture(e.pointerId);
+      const step = Number(cell.dataset.step);
+      const note = Number(cell.dataset.note);
+      const cover = live.spanCover && live.spanCover(step);
+      const same = cover && cover.note === note;
+      noteDrag = {
+        origin: same ? cover.start : step,
+        from: step,
+        note,
+        drawing: !same,
+        moved: false,
+      };
+      cell.setPointerCapture(e.pointerId);
     });
     grid.addEventListener("pointermove", (e) => {
-      if (!chanceDrag) return;
-      if (Math.abs(e.clientY - chanceDrag.y) > 4) chanceDrag.moved = true;
-      if (!chanceDrag.moved) return;
-      const rect = chanceDrag.el.getBoundingClientRect();
-      const t = 1 - (e.clientY - rect.top) / Math.max(rect.height, 1);
-      live.setChance(chanceDrag.step, Math.round(Math.min(1, Math.max(0, t)) * 20) / 20);
+      if (chanceDrag) {
+        if (Math.abs(e.clientY - chanceDrag.y) > 4) chanceDrag.moved = true;
+        if (!chanceDrag.moved) return;
+        const rect = chanceDrag.el.getBoundingClientRect();
+        const t = 1 - (e.clientY - rect.top) / Math.max(rect.height, 1);
+        live.setChance(chanceDrag.step, Math.round(Math.min(1, Math.max(0, t)) * 20) / 20);
+        paintLabels();
+        return;
+      }
+      if (!noteDrag) return;
+      const step = stepFromEvent(e);
+      if (step == null) return;
+      if (step !== noteDrag.from) noteDrag.moved = true;
+      if (!noteDrag.moved) return;
+      if (noteDrag.drawing) {
+        const a = Math.min(noteDrag.from, step);
+        const b = Math.max(noteDrag.from, step);
+        live.setSpan(a, b - a + 1, noteDrag.note);
+      } else {
+        live.setSpan(noteDrag.origin, Math.max(1, step - noteDrag.origin + 1), noteDrag.note);
+      }
       paintLabels();
     });
     grid.addEventListener("pointerup", () => {
-      if (!chanceDrag) return;
-      if (!chanceDrag.moved) live.cycleChance(chanceDrag.step);
-      chanceDrag = null;
-      paintLabels();
+      if (chanceDrag) {
+        if (!chanceDrag.moved) live.cycleChance(chanceDrag.step);
+        chanceDrag = null;
+        paintLabels();
+        return;
+      }
+      if (noteDrag) {
+        if (!noteDrag.moved) live.setStep(noteDrag.from, noteDrag.note);
+        noteDrag = null;
+        paintLabels();
+      }
     });
     grid.addEventListener("pointercancel", () => {
       chanceDrag = null;
+      noteDrag = null;
     });
     grid.addEventListener("dblclick", (e) => {
       const pad = e.target.closest(".chance");
@@ -863,17 +1144,6 @@ function bindDeck() {
       e.preventDefault();
       snapshot();
       live.setChance(Number(pad.dataset.step), 1);
-      paintLabels();
-    });
-    grid.addEventListener("click", (e) => {
-      if (e.target.closest(".chance")) {
-        e.preventDefault();
-        return;
-      }
-      const cell = e.target.closest(".cell");
-      if (!cell) return;
-      snapshot();
-      live.setStep(Number(cell.dataset.step), Number(cell.dataset.note));
       paintLabels();
     });
   }
@@ -929,7 +1199,7 @@ function bindDeck() {
     });
   }
 
-  window.rollInspire = () => {
+  window.rollResample = () => {
     snapshot();
     syncOffsetSlider();
     const pick = (id) => {
@@ -945,7 +1215,11 @@ function bindDeck() {
     pick("offset");
     pick("pitch");
     pick("pattern");
-    apply();
+    pick("density");
+    live.set({ ...readSliders(), forceIdea: true });
+    syncOffsetSlider();
+    if (live.rerollDensity) live.rerollDensity();
+    paintLabels();
     if (!live.playing && live.buffer && !$("play").disabled) {
       live.play().then(() => {
         $("play").textContent = "⏹ stop";
@@ -954,7 +1228,7 @@ function bindDeck() {
       });
     }
   };
-  $("inspire").addEventListener("click", () => window.rollInspire());
+  $("resample").addEventListener("click", () => window.rollResample());
 
   $("export").addEventListener("click", async () => {
     if (!live.buffer) return;
@@ -1068,7 +1342,7 @@ function bindDeck() {
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R")) {
       e.preventDefault();
-      if (!e.repeat) window.rollInspire();
+      if (!e.repeat) window.rollResample();
       return;
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z") && !e.shiftKey) {

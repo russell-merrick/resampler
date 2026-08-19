@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/app.css?v=44" />
+  <link rel="stylesheet" href="/static/app.css?v=61" />
 </head>
 <body>
   <header class="top">
@@ -73,7 +73,7 @@
         </div>
         <div class="transport">
           <div class="transport-row">
-            <button type="button" id="inspire" class="play inspire">💡 inspire</button>
+            <button type="button" id="resample" class="play resample"><span class="ico" aria-hidden="true">✂️</span> resample</button>
             <button type="button" id="play" class="play">▶ play</button>
             <label class="bpm-lab">bpm
               <span class="num-wrap">
@@ -115,7 +115,7 @@
           </div>
         </div>
         <div class="note-row" id="note-row"></div>
-        <canvas id="wave" class="wave" height="64" title="amber band = length/offset window"></canvas>
+        <canvas id="wave" class="wave" height="64" title="amber band = clip width / offset window"></canvas>
         <div class="kit-row">
           <input id="kit-name" placeholder="kit name" />
           <button type="button" class="ghost" id="kit-save">💾 save kit</button>
@@ -124,10 +124,10 @@
           <button type="button" class="ghost" id="kit-delete">delete</button>
         </div>
 
-        <div class="viz helm-wrap">
+        <div class="viz">
           <div class="viz-help">
             <button type="button" class="help" aria-label="Control star help">?</button>
-            <p class="tip">Drag a point along its axis. SPEED is how fast steps fire (whole notes to 32nds). PATTERN is the idea: lock, leap, reverse, ping-pong, call/response. LENGTH and OFFSET pick which bars of the sample you steal notes from. PITCH stays in the detected key. Ctrl+click or double-click a dot to lock it so Inspire will not change it.</p>
+            <p class="tip">Drag a point along its axis. NOTE LENGTH is how long each step is (half notes to 32nds). PATTERN is the idea: lock, leap, reverse, ping-pong, call/response. CLIP WIDTH and OFFSET pick which bars of the sample you steal notes from. PITCH stays in the detected key. DENSITY is how many steps fire — 100% is the full loop, 50% a random half, 10% one random hit. Resample picks a new set. Ctrl+click or double-click a dot to lock it so Resample will not change it.</p>
           </div>
           <canvas id="helm" width="720" height="380"></canvas>
         </div>
@@ -135,7 +135,7 @@
         <div class="seq-panel">
           <div class="panel-h">
             <span>🔁 the loop</span>
-            <span class="dim" id="loop-label">click a cell for the note · % row is chance</span>
+            <span class="dim" id="loop-label">click a cell · drag a note to extend · % row is chance</span>
           </div>
           <label class="key-lab">loop length
             <select id="loop-bars">
@@ -145,41 +145,19 @@
             </select>
           </label>
           <p class="hint-line" id="loop-explain">
-            Sample length/offset = which notes you can use. Loop length = how long the idea repeats.
-            The % row is chance: click 100→75→50→25→0, or drag to set. Missed steps stay silent.
+            Clip width / offset = which notes you can use. Loop length = how long the idea repeats.
+            Density (Resample / the control star) picks how many steps actually fire; the rest stay silent.
+            Click an active note to turn that step off and lower density. Click it again to bring it back.
+            Drag a note right to hold it across steps — the sample plays through instead of retriggering.
+            The % row is extra chance on the steps that remain.
           </p>
           <div id="seq-grid"></div>
-        </div>
-
-        <div class="motion-panel" id="motion">
-          <div class="panel-h">
-            <span>Automation</span>
-            <div class="panel-h-right">
-              <label class="key-lab">span
-                <select id="motion-bars">
-                  <option value="1">1 bar</option>
-                  <option value="2">2 bars</option>
-                  <option value="4" selected>4 bars</option>
-                  <option value="8">8 bars</option>
-                  <option value="16">16 bars</option>
-                </select>
-              </label>
-              <label class="check">loop
-                <input type="checkbox" id="motion-loop" checked />
-              </label>
-            </div>
-          </div>
-          <p class="hint-line">
-            Automate star params over time. Left handle is the start of the span, right is the end.
-            Locked axes are skipped. Uncheck loop to rise once and hold.
-          </p>
-          <div id="motion-lanes"></div>
         </div>
 
         <div class="viz">
           <div class="viz-help">
             <button type="button" class="help" aria-label="Map help">?</button>
-            <p class="tip">Melody map — visual only. Angle is pitch class (C at the top). Radius is time in the sample — center is the start, edge is the end. Dashed rings are your length/offset window. The path and highlighted star follow the loop; they do not edit it.</p>
+            <p class="tip">Melody map — visual only. Angle is pitch class (C at the top). Radius is time in the sample — center is the start, edge is the end. Dashed rings are your clip width / offset window. The path and highlighted star follow the loop; they do not edit it.</p>
           </div>
           <canvas id="star" width="720" height="440"></canvas>
         </div>
@@ -187,10 +165,10 @@
         <details class="sliders">
           <summary>🎚️ sliders</summary>
         <label class="fader">
-          <span class="fader-h"><span>speed</span><strong id="speed-val">16th</strong></span>
-          <input id="speed" type="range" min="0" max="7" step="1" value="5" />
-          <span class="ticks">
-            <i>1</i><i>1/2</i><i>1/4</i><i>1/8</i><i>8t</i><i>1/16</i><i>16t</i><i>1/32</i>
+          <span class="fader-h"><span>note length</span><strong id="speed-val">16th</strong></span>
+          <input id="speed" type="range" min="0" max="4" step="1" value="3" />
+          <span class="ticks" id="speed-ticks">
+            <i>1/2</i><i>1/4</i><i>1/8</i><i>1/16</i><i>1/32</i>
           </span>
         </label>
 
@@ -198,12 +176,12 @@
           <span class="fader-h"><span>pattern</span><strong id="pattern-val">lock</strong></span>
           <input id="pattern" type="range" min="0" max="7" step="1" value="0" />
           <span class="ticks" id="pattern-ticks">
-            <i>lock</i><i>jump</i><i>hold</i><i>rev</i><i>ping</i><i>leap</i><i>scat</i><i>call</i>
+            <i>lock</i><i>jump</i><i>leap</i><i>hold</i><i>rev</i><i>ping</i><i>scat</i><i>call</i>
           </span>
         </label>
 
         <label class="fader">
-          <span class="fader-h"><span>length</span><strong id="len-val">2 bars</strong></span>
+          <span class="fader-h"><span>clip width</span><strong id="len-val">2 bars</strong></span>
           <input id="length" type="range" min="0" max="3" step="1" value="1" />
           <span class="ticks"><i>1</i><i>2</i><i>4</i><i>8</i></span>
         </label>
@@ -218,6 +196,12 @@
           <span class="fader-h"><span>pitch</span><strong id="pitch-val">0 · in key</strong></span>
           <input id="pitch" type="range" min="0" max="12" step="1" value="6" />
           <span class="hint-line" id="pitch-hint">only scale tones from the detected key</span>
+        </label>
+
+        <label class="fader">
+          <span class="fader-h"><span>density</span><strong id="density-val">100%</strong></span>
+          <input id="density" type="range" min="1" max="10" step="1" value="10" />
+          <span class="ticks"><i>10</i><i></i><i></i><i></i><i>50</i><i></i><i></i><i></i><i></i><i>100</i></span>
         </label>
         </details>
       </div>
@@ -236,6 +220,8 @@
           <option value="light">☀️ light</option>
           <option value="neon">⚡ neon</option>
           <option value="rainbow">🌈 rainbow</option>
+          <option value="pink">💗 pink</option>
+          <option value="pink2">💗 neon pink</option>
         </select>
       </label>
       <label>default bpm
@@ -248,23 +234,89 @@
           <option value="4">4 bars</option>
         </select>
       </label>
-      <label class="check">auto-inspire on load
-        <input type="checkbox" id="opt-auto-inspire" />
+      <label class="check">auto-resample on load
+        <input type="checkbox" id="opt-auto-resample" />
       </label>
-      <button type="button" id="creeper-hiss" class="creeper-btn">creeper hiss</button>
+      <label class="check" title="Allow 8th- and 16th-triplet speeds. Off keeps Resample and the speed control in 4/4.">
+        triplets
+        <input type="checkbox" id="opt-triplets" />
+      </label>
+      <button type="button" id="fun-mode" class="fun-mode">FUN MODE!!!</button>
+      <div id="fun-toys" class="fun-toys hidden">
+        <button type="button" id="creeper-hiss" class="creeper-btn">creeper hiss</button>
+        <button type="button" id="cats-best" class="cats-btn">CATS ARE THE BEST!!!!</button>
+      </div>
       <p class="hint-line">Saved in this browser. Theme applies immediately.</p>
     </div>
   </div>
 
   <footer>
-    <p>Space play/stop · Ctrl+R inspire · Ctrl+Z undo</p>
+    <p>Space play/stop · Ctrl+R resample · Ctrl+Z undo</p>
   </footer>
+  <div id="pink-flash" class="pink-flash hidden" aria-hidden="true">
+    <canvas id="pink-fireworks"></canvas>
+  </div>
   <div id="creeper-boom" class="creeper-boom hidden" aria-hidden="true">
     <!-- Creeper: Xbox México / CC BY 3.0, Wikimedia File:Minecraft Creeper (Crop).png -->
     <img src="/static/creeper.png?v=2" alt="ssss…" id="creeper-pic" />
   </div>
-  <script src="/static/live.js?v=41"></script>
-  <script src="/static/viz.js?v=42"></script>
-  <script src="/static/app.js?v=42"></script>
+  <div id="cats-boom" class="cats-boom hidden" aria-hidden="true">
+    <canvas id="cats-fireworks" class="cats-fireworks"></canvas>
+    <button type="button" id="cats-close" class="cats-close">close</button>
+    <div class="cat-faces">
+      <figure class="cat-card">
+      <svg class="cat-face" viewBox="0 0 120 130" aria-label="black cat, green eyes">
+        <polygon points="18,52 28,8 52,42" fill="#111214"/>
+        <polygon points="102,52 92,8 68,42" fill="#111214"/>
+        <polygon points="26,42 30,18 44,40" fill="#2a1c18"/>
+        <polygon points="94,42 90,18 76,40" fill="#2a1c18"/>
+        <ellipse cx="60" cy="72" rx="44" ry="42" fill="#111214"/>
+        <ellipse cx="42" cy="70" rx="11" ry="13" fill="#3dcc4a"/>
+        <ellipse cx="78" cy="70" rx="11" ry="13" fill="#3dcc4a"/>
+        <ellipse cx="42" cy="71" rx="3.2" ry="8" fill="#0a0b0a"/>
+        <ellipse cx="78" cy="71" rx="3.2" ry="8" fill="#0a0b0a"/>
+        <circle cx="84" cy="64" r="2.4" fill="#8b5a2b"/>
+        <polygon points="60,84 54,92 66,92" fill="#3a2a28"/>
+        <path d="M50 100 Q60 108 70 100" fill="none" stroke="#2a1c18" stroke-width="2"/>
+        <g fill="none" stroke="#e8e2d6" stroke-width="1.6" stroke-linecap="round">
+          <path d="M22 82 L4 76"/>
+          <path d="M20 88 L2 90"/>
+          <path d="M22 94 L6 102"/>
+          <path d="M98 82 L116 76"/>
+          <path d="M100 88 L118 90"/>
+          <path d="M98 94 L114 102"/>
+        </g>
+      </svg>
+      <figcaption class="cat-name">EVEY!!!</figcaption>
+      </figure>
+      <figure class="cat-card">
+      <svg class="cat-face" viewBox="0 0 120 130" aria-label="black cat, orange eyes">
+        <polygon points="18,52 28,8 52,42" fill="#111214"/>
+        <polygon points="102,52 92,8 68,42" fill="#111214"/>
+        <polygon points="26,42 30,18 44,40" fill="#2a1c18"/>
+        <polygon points="94,42 90,18 76,40" fill="#2a1c18"/>
+        <ellipse cx="60" cy="72" rx="44" ry="42" fill="#111214"/>
+        <ellipse cx="42" cy="70" rx="11" ry="13" fill="#e07a1a"/>
+        <ellipse cx="78" cy="70" rx="11" ry="13" fill="#e07a1a"/>
+        <ellipse cx="42" cy="71" rx="3.2" ry="8" fill="#0a0b0a"/>
+        <ellipse cx="78" cy="71" rx="3.2" ry="8" fill="#0a0b0a"/>
+        <polygon points="60,84 54,92 66,92" fill="#3a2a28"/>
+        <path d="M50 100 Q60 108 70 100" fill="none" stroke="#2a1c18" stroke-width="2"/>
+        <g fill="none" stroke="#e8e2d6" stroke-width="1.6" stroke-linecap="round">
+          <path d="M22 82 L4 76"/>
+          <path d="M20 88 L2 90"/>
+          <path d="M22 94 L6 102"/>
+          <path d="M98 82 L116 76"/>
+          <path d="M100 88 L118 90"/>
+          <path d="M98 94 L114 102"/>
+        </g>
+      </svg>
+      <figcaption class="cat-name">JASPER!!!</figcaption>
+      </figure>
+    </div>
+  </div>
+  <script src="/static/live.js?v=57"></script>
+  <script src="/static/viz.js?v=54"></script>
+  <script src="/static/app.js?v=63"></script>
 </body>
 </html>
