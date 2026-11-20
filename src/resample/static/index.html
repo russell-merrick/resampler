@@ -4,10 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Resampler</title>
+  <link rel="icon" href="/static/favicon.ico?v=1" sizes="any" />
+  <link rel="icon" type="image/png" href="/static/favicon.png?v=1" />
+  <script>
+    try {
+      var fontScale = Number(localStorage.getItem("resample-font-scale"));
+      if (fontScale >= 0.8 && fontScale <= 1.6) {
+        document.documentElement.style.setProperty("--font-scale", String(Math.round(fontScale * 10) / 10));
+      }
+    } catch (err) {}
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/app.css?v=61" />
+  <link rel="stylesheet" href="/static/app.css?v=62" />
 </head>
 <body>
   <header class="top">
@@ -224,6 +234,13 @@
           <option value="pink2">💗 neon pink</option>
         </select>
       </label>
+      <label>font size
+        <span class="font-size-ctrl">
+          <button type="button" id="font-down" aria-label="Smaller font">−</button>
+          <output id="font-size-label">100%</output>
+          <button type="button" id="font-up" aria-label="Larger font">+</button>
+        </span>
+      </label>
       <label>default bpm
         <input id="opt-bpm" type="number" min="60" max="220" step="1" value="128" />
       </label>
@@ -317,6 +334,6 @@
   </div>
   <script src="/static/live.js?v=57"></script>
   <script src="/static/viz.js?v=54"></script>
-  <script src="/static/app.js?v=63"></script>
+  <script src="/static/app.js?v=64"></script>
 </body>
 </html>

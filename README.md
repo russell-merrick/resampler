@@ -26,6 +26,8 @@ resample serve
 
 Open http://127.0.0.1:8787
 
+The Resampler shortcut on the desktop starts the server if it is not already running and opens the page in its own window. On a Mac, double-click `Resampler.app` in this folder. It does the same thing. The first launch may need a right-click and Open. If macOS says the app is damaged, run `chmod +x Resampler.app/Contents/MacOS/launcher`. The window needs Microsoft Edge or Google Chrome.
+
 - Search the local Splice library (vocals + bass + synth; no perc)
 - **Use** a file → play with space
 - Drag the **control star** (note length, clip width, offset, pitch, pattern, density)

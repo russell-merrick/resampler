@@ -10,6 +10,7 @@
   --on-accent: #1a1308;
   --ok: #7dba6a;
   --danger: #c44b3c;
+  --font-scale: 1;
 }
 [data-theme="light"] {
   --bg: #f3eee6;
@@ -124,7 +125,7 @@
 html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); }
 body {
   font-family: "IBM Plex Sans", sans-serif;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale));
 }
 
 .top {
@@ -140,7 +141,7 @@ body {
   font-family: "IBM Plex Mono", monospace;
   font-weight: 500;
   letter-spacing: 0.22em;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale));
   margin: 0;
 }
 .led {
@@ -150,11 +151,11 @@ body {
   display: inline-block;
   transform: translateY(-1px);
 }
-.dim { color: var(--dim); font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.06em; }
+.dim { color: var(--dim); font-family: "IBM Plex Mono", monospace; font-size: calc(11px * var(--font-scale)); letter-spacing: 0.06em; }
 .fun-mode {
   margin-top: 8px;
   padding: 10px 14px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale));
   font-weight: 700;
   letter-spacing: 0.12em;
   background: var(--panel);
@@ -179,7 +180,7 @@ body {
 .creeper-btn {
   margin-left: 4px;
   padding: 4px 10px;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
   letter-spacing: 0.12em;
   text-transform: uppercase;
   background: #1a2e14;
@@ -190,7 +191,7 @@ body {
 .cats-btn {
   margin-top: 0;
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   letter-spacing: 0.06em;
   text-transform: uppercase;
   background: #1a1218;
@@ -249,7 +250,7 @@ body {
 .cat-name {
   margin: 0;
   font-family: "IBM Plex Mono", monospace;
-  font-size: clamp(18px, 4vw, 32px);
+  font-size: clamp(calc(18px * var(--font-scale)), 4vw, calc(32px * var(--font-scale)));
   font-weight: 700;
   letter-spacing: 0.12em;
   color: #fff0c8;
@@ -381,18 +382,18 @@ main { padding: 28px; max-width: 1180px; margin: 0 auto; display: flex; flex-dir
   grid-column: 3;
   color: var(--dim);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
 }
 .lib-hit .name {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .lib-hit .kind {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--amber);
@@ -409,7 +410,7 @@ main { padding: 28px; max-width: 1180px; margin: 0 auto; display: flex; flex-dir
   padding: 8px 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   font-family: "IBM Plex Mono", monospace;
 }
 .ghost:hover,
@@ -448,7 +449,7 @@ button:hover:not(.play):not(.resample) {
   line-height: 1;
 }
 .resample .ico {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   line-height: 1;
   margin-right: 4px;
 }
@@ -497,7 +498,7 @@ button:hover:not(.play):not(.resample) {
   border-radius: 0;
   background: var(--panel);
   color: var(--amber);
-  font-size: 8px;
+  font-size: calc(8px * var(--font-scale));
   line-height: 1;
   letter-spacing: 0;
 }
@@ -531,7 +532,7 @@ button:hover:not(.play):not(.resample) {
 }
 .note-chip {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   letter-spacing: 0.06em;
   border: 1px solid #3a372f;
   padding: 4px 8px;
@@ -557,7 +558,7 @@ button:hover:not(.play):not(.resample) {
 #kit-name { min-width: 140px; }
 .drag-live {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   padding: 4px 8px;
   border: 1px solid var(--line);
   background: var(--bg);
@@ -585,7 +586,7 @@ button:hover:not(.play):not(.resample) {
   padding: 0;
   border-radius: 0;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--amber);
   border-color: var(--line);
   background: var(--bg);
@@ -603,14 +604,14 @@ button:hover:not(.play):not(.resample) {
   border: 1px solid var(--line);
   color: var(--ink);
   font-family: "IBM Plex Sans", sans-serif;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   letter-spacing: 0;
   text-transform: none;
   line-height: 1.45;
   box-shadow: 0 8px 24px rgba(0,0,0,0.45);
 }
 .viz-help:hover .tip, .viz-help:focus-within .tip { display: block; }
-.sliders { margin: 8px 0 16px; color: var(--dim); font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+.sliders { margin: 8px 0 16px; color: var(--dim); font-family: "IBM Plex Mono", monospace; font-size: calc(11px * var(--font-scale)); letter-spacing: 0.1em; text-transform: uppercase; }
 .sliders summary { cursor: pointer; margin-bottom: 10px; }
 .seq-panel { margin-top: 8px; }
 #seq-grid { width: 100%; }
@@ -625,7 +626,7 @@ button:hover:not(.play):not(.resample) {
   width: 42px;
   flex: 0 0 42px;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
   color: var(--dim);
 }
 .cell {
@@ -676,7 +677,7 @@ button:hover:not(.play):not(.resample) {
   border: 1px solid #2f2c26;
   background: #141310;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: calc(9px * var(--font-scale));
   letter-spacing: 0;
   color: var(--amber);
   cursor: ns-resize;
@@ -704,7 +705,7 @@ button:hover:not(.play):not(.resample) {
   display: flex;
   justify-content: space-between;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--dim);
@@ -762,9 +763,9 @@ input[type="range"]::-moz-range-thumb {
   justify-content: space-between;
   color: var(--dim);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
 }
-.hint-line { color: var(--dim); font-size: 11px; }
+.hint-line { color: var(--dim); font-size: calc(11px * var(--font-scale)); }
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -776,7 +777,7 @@ input[type="range"]::-moz-range-thumb {
   align-items: center;
   gap: 12px;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--amber);
@@ -795,14 +796,14 @@ label {
   flex-direction: column;
   gap: 4px;
   color: var(--dim);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-family: "IBM Plex Mono", monospace;
 }
 input, select { padding: 7px 8px; }
 
-footer { padding: 8px 28px 24px; color: var(--dim); max-width: 1180px; margin: 0 auto; font-size: 12px; }
+footer { padding: 8px 28px 24px; color: var(--dim); max-width: 1180px; margin: 0 auto; font-size: calc(12px * var(--font-scale)); }
 
 .modal {
   position: fixed;
@@ -824,6 +825,22 @@ footer { padding: 8px 28px 24px; color: var(--dim); max-width: 1180px; margin: 0
   gap: 12px;
 }
 .modal-card label { text-transform: uppercase; }
+.font-size-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.font-size-ctrl button {
+  width: 36px;
+  padding: 6px 0;
+}
+.font-size-ctrl button:disabled { opacity: 0.4; cursor: default; }
+.font-size-ctrl output {
+  flex: 1;
+  text-align: center;
+  color: var(--ink);
+  text-transform: none;
+}
 .modal-card input, .modal-card select { width: 100%; }
 
 @media (max-width: 860px) {
