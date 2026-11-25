@@ -9,8 +9,8 @@ It is **not** Simpler and **not** a VST. Simpler chops time. Resampler chops the
 ## Install
 
 ```powershell
-git clone https://github.com/YOU/resample.git
-cd resample
+git clone https://github.com/russell-merrick/resampler.git
+cd resampler
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev,stretch]"
@@ -26,7 +26,7 @@ resample serve
 
 Open http://127.0.0.1:8787
 
-The Resampler shortcut on the desktop starts the server if it is not already running and opens the page in its own window. On a Mac, double-click `Resampler.app` in this folder. It does the same thing. The first launch may need a right-click and Open. If macOS says the app is damaged, run `chmod +x Resampler.app/Contents/MacOS/launcher`. The window needs Microsoft Edge or Google Chrome.
+Run `launch.vbs` in this folder, or a desktop shortcut that points at it. It starts the server when http://127.0.0.1:8787/api/health is down, preferring `.venv\Scripts\pythonw.exe` and setting `PYTHONPATH` to `src`, then opens the page in its own Edge window at 1280×800. That size is set on every launch, so a resized window does not stick. Closing the window leaves the server running. On a Mac, double-click `Resampler.app` in this folder. It does the same thing. The first launch may need a right-click and Open. If macOS says the app is damaged, run `chmod +x Resampler.app/Contents/MacOS/launcher`. The window needs Microsoft Edge or Google Chrome. Font size is in the options window, from 80% to 160%.
 
 - Search the local Splice library (vocals + bass + synth; no perc)
 - **Use** a file → play with space
